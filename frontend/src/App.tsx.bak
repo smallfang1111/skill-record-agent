@@ -1,0 +1,865 @@
+import { useState, useEffect, useCallback } from 'react'
+import './App.css'
+
+interface Skill { id: string; name: string; goal: string; steps: { id: string; content: string; status: string; note: string; completedAt?: string }[] }
+interface Session { id: string; title: string; messages: { role: string; content: string; timestamp: string }[] }
+
+type Page = 'dashboard' | 'skills' | 'chat' | 'memory' | 'timeline'
+
+/* ════════════════════════════
+   通用模态框组件
+   ════════════════════════════ */
+
+function Modal({
+  open, title, onClose, children, width = 520
+}: {
+  open: boolean
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+  width?: number
+}) {
+  if (!open) return null
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{ width }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">{title}</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════
+   App 主组件
+   ════════════════════════════ */
+
+function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard')
+  const [detailSkillId, setDetailSkillId] = useState<string | null>(null)
+
+  // 编辑弹窗状态（从详情页也能打开）
+  const [editSkillId, setEditSkillId] = useState<string | null>(null)
+
+  // 聊天状态提升到这里，避免切 tab 时丢失
+  const [chatSessions, setChatSessions] = useState<Record<string,Session[]>>({})
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
+  return (
+    <div className="app-layout">
+      {/* 左侧边栏 */}
+      <aside className="sidebar">
+        <div className="logo-area">
+          <div className="logo-icon">📚</div>
+          <h1 className="logo-title">学习管家</h1>
+          <p className="logo-sub">记录你的学习过程</p>
+        </div>
+
+        <nav className="nav-menu">
+          <button className={'nav-item'+(currentPage==='dashboard'?' active':'')} onClick={()=>setCurrentPage('dashboard')}>🏠 仪表盘</button>
+          <button className={'nav-item'+(currentPage==='skills'?' active':'')} onClick={()=>setCurrentPage('skills')}>✅ 技能管理</button>
+          <button className={'nav-item'+(currentPage==='chat'?' active':'')} onClick={()=>setCurrentPage('chat')}>💬 AI 助手</button>
+          <button className={'nav-item'+(currentPage==='memory'?' active':'')} onClick={()=>setCurrentPage('memory')}>📝 记忆库</button>
+          <button className={'nav-item'+(currentPage==='timeline'?' active':'')} onClick={()=>setCurrentPage('timeline')}>🕐 时间线</button>
+        </nav>
+
+        <div className="sidebar-footer"><p className="footer-hint">还没有技能？去添加吧！</p></div>
+      </aside>
+
+      {/* 右侧内容区 — 始终渲染 ChatPage，用 display 控制显隐 */}
+      <main className="main-content">
+        <div style={{display: currentPage!=='dashboard' ? 'none' : 'block'}}>
+          <DashboardPage onGoSkills={()=>setCurrentPage('skills')} />
+        </div>
+        <div style={{display: currentPage!=='skills' ? 'none' : 'block'}}>
+          {detailSkillId
+            ? <SkillDetailPage skillId={detailSkillId} onBack={()=>setDetailSkillId(null)} onEdit={(id)=>{setEditSkillId(id);setDetailSkillId(null);}} />
+            : <SkillsPage onOpenDetail={setDetailSkillId} onOpenEdit={setEditSkillId} />
+          }
+        </div>
+
+        {/* 编辑技能弹窗（从 App 层管理，这样详情页也能打开） */}
+        {editSkillId && <EditSkillModal skillId={editSkillId} onClose={()=>setEditSkillId(null)} onSaved={()=>{setEditSkillId(null);setDetailSkillId(null);}} />}
+        <div style={{display: currentPage!=='chat' ? 'none' : 'block'}}>
+          <ChatPage
+            sessions={chatSessions}
+            setSessions={setChatSessions}
+            currentSessionId={currentSessionId}
+            setCurrentSessionId={setCurrentSessionId}
+          />
+        </div>
+        <div style={{display: currentPage!=='memory' ? 'none' : 'block'}}>
+          <MemoryPage />
+        </div>
+        <div style={{display: currentPage!=='timeline' ? 'none' : 'block'}}>
+          <TimelinePage />
+        </div>
+      </main>
+    </div>
+  )
+}
+
+/* ════════════════════════════
+   仪表盘
+   ════════════════════════════ */
+
+function DashboardPage({ onGoSkills }: { onGoSkills: () => void }) {
+  const [stats, setStats] = useState({ skills:0, completed:0, sessions:0 })
+  useEffect(()=>{
+    fetch('http://localhost:8000/api/skills').then(r=>r.json()).then(d=>{
+      const all=d.skills.flatMap((s:Skill)=>s.steps)
+      setStats({ skills:d.skills.length, completed:all.filter((s:any)=>s.status==='completed').length, sessions:0 })
+    }).catch(()=>{})
+  },[])
+  return (
+    <div className="page">
+      <div className="page-header"><h2>🏠 学习仪表盘</h2></div>
+      <div className="empty-state-large">
+        <div className="empty-icon">🎯</div><h3>开始你的学习之旅</h3>
+        <p>在「技能管理」中添加技能和学习计划，<br/>追踪进度并与 AI 助手聊天来创建计划！</p>
+        <button className="btn-outline" onClick={onGoSkills}>➜ 去添加技能</button>
+      </div>
+      <div className="stat-cards">
+        <div className="stat-card"><span className="stat-number">{stats.skills}</span><span className="stat-label">学习技能数</span></div>
+        <div className="stat-card"><span className="stat-number">{stats.completed}</span><span className="stat-label">已完成步骤</span></div>
+        <div className="stat-card"><span className="stat-number">{stats.sessions}</span><span className="stat-label">AI 对话次数</span></div>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════
+   编辑技能弹窗组件（独立，可从列表页和详情页调用）
+   ════════════════════════════ */
+
+function EditSkillModal({ skillId, onClose, onSaved }: { skillId: string; onClose: () => void; onSaved: () => void }) {
+  const [skill, setSkill] = useState<Skill | null>(null)
+  const [form, setForm] = useState({ name: '', goal: '', steps: '' })
+  const [loading, setLoading] = useState(false)
+
+  // 加载技能数据
+  useEffect(() => {
+    fetch('http://localhost:8000/api/skills').then(r=>r.json()).then(d=>{
+      const found = (d.skills||[]).find((s: any)=>s.id===skillId)
+      if(found) {
+        setSkill(found)
+        setForm({
+          name: found.name,
+          goal: found.goal,
+          steps: found.steps.map((s: any)=>s.content).join('\n')
+        })
+      }
+    }).catch(()=>{})
+  }, [skillId])
+
+  // 提交编辑
+  const submitEdit = async () => {
+    if(!form.name || !form.goal) return
+    setLoading(true)
+    const steps = form.steps.split('\n').filter(s=>s.trim())
+    await fetch('http://localhost:8000/api/skills/'+skillId, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: form.name,
+        goal: form.goal,
+        steps: steps
+      })
+    })
+    setLoading(false)
+    onSaved()
+  }
+
+  if(!skill) return null
+
+  return (
+    <Modal open={true} title="编辑技能" onClose={onClose}>
+      <div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <div className="form-field">
+          <label className="field-label"><span className="required">*</span> 技能名称</label>
+          <input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="输入技能名称"/>
+        </div>
+        <div className="form-field">
+          <label className="field-label"><span className="required">*</span> 学习目标</label>
+          <input className="input" value={form.goal} onChange={e=>setForm({...form,goal:e.target.value})} placeholder="输入学习目标"/>
+        </div>
+        <div className="form-field">
+          <label className="field-label"><span className="required">*</span> 学习步骤</label>
+          <textarea className="textarea" rows={6} value={form.steps} onChange={e=>setForm({...form,steps:e.target.value})} placeholder="每行一个步骤"/>
+        </div>
+        <div className="form-actions">
+          <button className="btn-secondary" onClick={onClose}>取消</button>
+          <button className="btn-primary" onClick={submitEdit} disabled={loading}>{loading?'保存中...':'确定'}</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/* ════════════════════════════
+   技能管理（含编辑/笔记弹窗）
+   ══════════════════════════════ */
+
+function SkillsPage({ onOpenDetail, onOpenEdit }: { onOpenDetail: (id: string) => void; onOpenEdit: (id: string) => void }) {
+  const [skills, setSkills] = useState<Skill[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name:'', goal:'', steps:'' })
+  const [loading, setLoading] = useState(false)
+
+  // ── 编辑弹窗状态 ──
+  const [editOpen, setEditOpen] = useState(false)
+  const [editSkill, setEditSkill] = useState<Skill | null>(null)
+  const [editForm, setEditForm] = useState({ name:'', goal:'', steps:'' })
+
+  // ── 笔记弹窗状态 ──
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteSkillId, setNoteSkillId] = useState('')
+  const [noteStepId, setNoteStepId] = useState('')
+  const [noteStepName, setNoteStepName] = useState('')
+  const [noteContent, setNoteContent] = useState('')
+  const [noteMode, setNoteMode] = useState<'add' | 'view'>('add')
+
+  // ── 删除确认弹窗状态 ──
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteSkill, setDeleteSkill] = useState<Skill | null>(null)
+
+  // ── 导出下拉菜单 ──
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+
+  // ── 搜索与筛选 ──
+  const [searchKey, setSearchKey] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all'|'completed'|'inprogress'>('all')
+
+  const load = ()=>fetch('http://localhost:8000/api/skills').then(r=>r.json()).then(d=>setSkills(d.skills||[])).catch(()=>{})
+  useEffect(()=>{ load() }, [])
+
+  // ── 创建技能 ──
+  const create=async()=>{
+    if(!form.name||!form.goal) return
+    setLoading(true)
+    const steps=form.steps.split('\n').filter(s=>s.trim())
+    await fetch('http://localhost:8000/api/skills',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.name,goal:form.goal,steps})})
+    setForm({name:'',goal:'',steps:''}); setShowForm(false); load(); setLoading(false)
+  }
+
+  // ── 完成步骤 ──
+  const done=async(skillId:string,stepId:string)=>{
+    await fetch('http://localhost:8000/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skill_id:skillId,completed_step:stepId,note:''})})
+    load()
+  }
+
+  // ── 删除技能（打开确认弹窗） ──
+  const openDeleteConfirm=(skill:Skill)=>{
+    setDeleteSkill(skill)
+    setDeleteOpen(true)
+  }
+
+  // ── 确认删除 ──
+  const confirmDelete=async()=>{
+    if(!deleteSkill) return
+    await fetch('http://localhost:8000/api/skills/'+deleteSkill.id,{method:'DELETE'})
+    setDeleteOpen(false); load()
+  }
+
+  // ── 导出 Markdown ──
+  const exportMarkdown=()=>{
+    setExportMenuOpen(false)
+    let md = '# 学习记录\n\n'
+    skills.forEach(skill=>{
+      const completed = skill.steps.filter((s:any)=>s.status==='completed').length
+      const total = skill.steps.length
+      md += `## ${skill.name}\n\n`
+      md += `**目标**：${skill.goal}\n\n`
+      md += `**进度**：${completed}/${total} (${total?Math.round(completed/total*100):0}%)\n\n`
+      md += '**步骤**：\n'
+      skill.steps.forEach((step:any)=>{
+        const check = step.status==='completed' ? '✅' : '⬜'
+        md += `- ${check} ${step.content}\n`
+        if(step.note) md += `  > 📝 ${step.note}\n`
+      })
+      md += '\n'
+    })
+    const blob = new Blob([md], {type:'text/markdown;charset=utf-8'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `学习记录_${new Date().toISOString().slice(0,10)}.md`
+    a.click(); URL.revokeObjectURL(url)
+  }
+
+  // ── 导出 PDF（打印友好页面） ──
+  const exportPDF=()=>{
+    setExportMenuOpen(false)
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>学习记录</title>
+    <style>
+      body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:40px;color:#333;}
+      h1{border-bottom:2px solid #e74c3c;padding-bottom:10px;}
+      h2{color:#e74c3c;margin-top:30px;}
+      .progress{color:#888;font-size:14px;margin:8px 0;}
+      .step{margin:4px 0;font-size:14px;}
+      .done{color:#999;text-decoration:line-through;}
+      .note{color:#666;font-size:13px;margin:2px 0 2px 24px;padding:4px 8px;background:#f9f9f9;border-radius:4px;}
+      @media print{.no-print{display:none;}}
+    </style></head><body>
+    <button class="no-print" onclick="window.print()" style="padding:8px 20px;background:#e74c3c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;margin-bottom:20px;">打印 / 保存为PDF</button>
+    <h1>📚 学习记录</h1>`
+    skills.forEach(skill=>{
+      const completed = skill.steps.filter((s:any)=>s.status==='completed').length
+      const total = skill.steps.length
+      html += `<h2>${skill.name}</h2>`
+      html += `<p><strong>目标：</strong>${skill.goal}</p>`
+      html += `<p class="progress">进度：${completed}/${total}（${total?Math.round(completed/total*100):0}%）</p>`
+      html += '<div style="margin-top:10px;">'
+      skill.steps.forEach((step:any)=>{
+        const cls = step.status==='completed'?'done':''
+        html += `<div class="step ${cls}">${step.status==='completed'?'✅':'⬜'} ${step.content}</div>`
+        if(step.note) html += `<div class="note">📝 ${step.note}</div>`
+      })
+      html += '</div>'
+    })
+    html += '</body></html>'
+    const w = window.open('','_blank')
+    if(w) w.document.write(html)
+  }
+
+  // ── 打开编辑弹窗 ──
+  const openEdit=(skill:Skill)=>{
+    setEditSkill(skill)
+    setEditForm({
+      name: skill.name,
+      goal: skill.goal,
+      steps: skill.steps.map(s=>s.content).join('\n')
+    })
+    setEditOpen(true)
+  }
+
+  // ── 提交编辑 ──
+  const submitEdit=async()=>{
+    if(!editForm.name||!editForm.goal||!editSkill) return
+    setLoading(true)
+    await fetch('http://localhost:8000/api/skills/'+editSkill.id,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name: editForm.name,
+        goal: editForm.goal,
+        steps: editForm.steps.split('\n').filter(s=>s.trim())
+      })
+    })
+    setEditOpen(false); load(); setLoading(false)
+  }
+
+  // ── 打开笔记弹窗（查看/编辑） ──
+  const openNote=(skillId:string, step:any, mode:'add'|'view')=>{
+    setNoteSkillId(skillId)
+    setNoteStepId(step.id)
+    setNoteStepName(step.content)
+    setNoteContent(step.note || '')
+    setNoteMode(mode)
+    setNoteOpen(true)
+  }
+
+  // ── 保存笔记 ──
+  const saveNote=async()=>{
+    await fetch('http://localhost:8000/api/notes',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({skill_id:noteSkillId,step_id:noteStepId,note:noteContent})
+    })
+    setNoteOpen(false); load()
+  }
+
+  // ── 筛选后的技能列表 ──
+  const filteredSkills = skills.filter(s=>{
+    const matchKey = !searchKey || s.name.includes(searchKey) || s.goal.includes(searchKey)
+    if(filterStatus==='all') return matchKey
+    if(filterStatus==='completed') return matchKey && s.steps.filter((st:any)=>st.status==='completed').length === s.steps.length
+    if(filterStatus==='inprogress') return matchKey && s.steps.filter((st:any)=>st.status==='completed').length < s.steps.length
+    return true
+  })
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2>✅ 技能管理</h2>
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          <button className="btn-primary" onClick={()=>setShowForm(!showForm)}>+ 新增技能</button>
+          <div style={{position:'relative'}}>
+            <button className="btn-secondary" onClick={()=>setExportMenuOpen(!exportMenuOpen)}>📥 导出 ▾</button>
+            {exportMenuOpen && (
+              <div style={{position:'absolute',top:'100%',right:0,background:'#fff',border:'1px solid #eee',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.1)',zIndex:100,minWidth:140}}>
+                <button onClick={exportMarkdown} style={{display:'block',width:'100%',padding:'10px 16px',border:'none',background:'none',textAlign:'left',cursor:'pointer',fontSize:13}}>📝 导出 Markdown</button>
+                <button onClick={exportPDF} style={{display:'block',width:'100%',padding:'10px 16px',border:'none',background:'none',textAlign:'left',cursor:'pointer',fontSize:13}}>🖨️ 打印 / 导出 PDF</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 搜索与筛选 */}
+      <div style={{display:'flex',gap:10,marginBottom:16,alignItems:'center'}}>
+        <input
+          className="input"
+          style={{flex:1,maxWidth:280}}
+          placeholder="🔍 搜索技能名称或目标..."
+          value={searchKey}
+          onChange={e=>setSearchKey(e.target.value)}
+        />
+        <div style={{display:'flex',gap:6,fontSize:13}}>
+          {(['all','inprogress','completed'] as const).map(s=>(
+            <button
+              key={s}
+              onClick={()=>setFilterStatus(s)}
+              style={{
+                padding:'6px 14px',
+                border:'1px solid '+ (filterStatus===s?'#e74c3c':'#eee'),
+                borderRadius:6,
+                background: filterStatus===s?'#e74c3c':'#fff',
+                color: filterStatus===s?'#fff':'#666',
+                cursor:'pointer',
+                fontSize:12.5,
+                fontWeight: filterStatus===s?600:400,
+              }}
+            >
+              {s==='all'?'全部':s==='inprogress'?'进行中':'已完成'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 新增技能表单 */}
+      {showForm && (
+        <div className="card form-card" style={{flexDirection:'column',gap:12}}>
+          <div className="form-field">
+            <label className="field-label"><span className="required">*</span> 技能名称</label>
+            <input className="input" placeholder="例如：雅思备考、Python 编程" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+          </div>
+          <div className="form-field">
+            <label className="field-label"><span className="required">*</span> 学习目标</label>
+            <input className="input" placeholder="例如：雅思 7.5 分、掌握基础语法" value={form.goal} onChange={e=>setForm({...form,goal:e.target.value})}/>
+          </div>
+          <div className="form-field">
+            <label className="field-label"><span className="required">*</span> 学习步骤</label>
+            <textarea className="textarea" rows={5} placeholder={"每行一个步骤，例如：\n背单词 3000 个\n听力练习每天 1 小时\n口语跟读练习"} value={form.steps} onChange={e=>setForm({...form,steps:e.target.value})}/>
+          </div>
+          <div className="form-actions">
+            <button className="btn-secondary" onClick={()=>setShowForm(false)}>取消</button>
+            <button className="btn-primary" onClick={create} disabled={loading}>{loading?'创建中...':'确认创建'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* 技能网格列表 */}
+      {filteredSkills.length===0 && !showForm && (
+        <div className="empty-state"><p>{searchKey||filterStatus!=='all'?'没有符合条件的技能':'暂无技能，点击上方按钮添加吧！'}</p></div>
+      )}
+      <div className="skill-grid">
+      {filteredSkills.map(skill=>{
+        const completed=skill.steps.filter((s:any)=>s.status==='completed').length
+        const total=skill.steps.length
+        const pct=total?Math.round(completed/total*100):0
+        return(
+          <div key={skill.id} className="skill-grid-card" onClick={()=>onOpenDetail(skill.id)}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div className="skill-icon">&#128218;</div>
+              <div>
+                <h3 className="skill-grid-name">{skill.name}</h3>
+                <p className="skill-grid-goal">{skill.goal}</p>
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12,paddingTop:10,borderTop:'1px solid #f0f0f0'}}>
+              <span style={{fontSize:11.5,color:'#888'}}>步骤 {completed}/{total}</span>
+              <span className="badge" style={{fontSize:11}}>{pct}%</span>
+            </div>
+          </div>
+        )
+      })}
+      </div>
+
+      {/* 编辑技能弹窗 */}
+      <Modal open={editOpen} title="编辑技能" onClose={()=>setEditOpen(false)}>
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div className="form-field">
+            <label className="field-label"><span className="required">*</span> 技能名称</label>
+            <input className="input" value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="输入技能名称"/>
+          </div>
+          <div className="form-field">
+            <label className="field-label"><span className="required">*</span> 学习目标</label>
+            <input className="input" value={editForm.goal} onChange={e=>setEditForm({...editForm,goal:e.target.value})} placeholder="输入学习目标"/>
+          </div>
+          <div className="form-field">
+            <label className="field-label"><span className="required">*</span> 学习步骤</label>
+            <textarea className="textarea" rows={6} value={editForm.steps} onChange={e=>setEditForm({...editForm,steps:e.target.value})} placeholder="每行一个步骤"/>
+          </div>
+          <div className="form-actions">
+            <button className="btn-secondary" onClick={()=>setEditOpen(false)}>取消</button>
+            <button className="btn-primary" onClick={submitEdit} disabled={loading}>{loading?'保存中...':'确定'}</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ═══════════════════════
+          学习笔记弹窗
+          ═══════════════════════ */}
+      <Modal open={noteOpen} title={noteMode === 'view' ? '查看笔记' : '编辑笔记'} onClose={()=>setNoteOpen(false)} width={500}>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div className="note-step-info">
+            <span className="note-step-label">步骤：</span>
+            <span className="note-step-name">{noteStepName}</span>
+          </div>
+          <div className="form-field" style={{marginBottom:4}}>
+            <label className="field-label">笔记内容</label>
+            <textarea
+              className="textarea note-textarea"
+              rows={8}
+              value={noteContent}
+              onChange={e=>setNoteContent(e.target.value)}
+              placeholder="记录你的学习心得、重点内容、参考资料..."
+            />
+            <div className="char-count">{noteContent.length} 字</div>
+          </div>
+          <div className="form-actions">
+            <button className="btn-secondary" onClick={()=>setNoteOpen(false)}>取消</button>
+            <button className="btn-primary" onClick={saveNote}>保存</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ═══════════════════════
+          删除确认弹窗
+          ═══════════════════════ */}
+      <Modal open={deleteOpen} title="删除技能" onClose={()=>setDeleteOpen(false)} width={420}>
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <p style={{fontSize:14,color:'#333',lineHeight:1.6,margin:0}}>
+            确定将技能【<strong>{deleteSkill?.name}</strong>】删除吗？
+          </p>
+  
+          <div className="form-actions">
+            <button className="btn-secondary" onClick={()=>setDeleteOpen(false)}>取消</button>
+            <button className="btn-danger" onClick={confirmDelete}>确定删除</button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
+/* ════════════════════════════
+   AI 助手（DeepSeek 风格）
+   状态由 App 管理，不会因 tab 丢失
+   ════════════════════════════ */
+
+function ChatPage({
+  sessions, setSessions,
+  currentSessionId, setCurrentSessionId
+}: {
+  sessions: Record<string, Session[]>
+  setSessions: (s: Record<string, Session[]>) => void
+  currentSessionId: string | null
+  setCurrentSessionId: (id: string | null) => void
+}) {
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const loadSessions = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/sessions')
+      const data = await res.json()
+      setSessions(data.groups || {})
+    } catch (e) {}
+  }, [setSessions])
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/sessions')
+        const data = await res.json()
+        if (!mounted) return
+        const all = Object.values(data.groups || {}).flat()
+        if (all.length > 0 && !currentSessionId) {
+          setCurrentSessionId(all[0].id)
+        }
+        setSessions(data.groups || {})
+      } catch (e) {}
+    })()
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleNewChat = async () => {
+    const res = await fetch('http://localhost:8000/api/sessions', { method: 'POST' })
+    const data = await res.json()
+    setCurrentSessionId(data.session.id)
+    loadSessions()
+  }
+
+  const selectSession = async (id: string) => {
+    setCurrentSessionId(id)
+  }
+
+  const send = async () => {
+    if (!message.trim() || !currentSessionId || loading) return
+    setLoading(true)
+    try {
+      const res = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: currentSessionId, message: message.trim() })
+      })
+      const data = await res.json()
+      if (data.session) {
+        setSessions(prev => {
+          const updated = { ...prev }
+          for (const group of Object.values(updated)) {
+            for (const s of group as any[]) {
+              if (s.id === data.session.id) {
+                s.messages = data.session.messages
+                break
+              }
+            }
+          }
+          return updated
+        })
+      }
+      setMessage('')
+    } catch (e) {}
+    setLoading(false)
+  }
+
+  const del = async (id: string) => {
+    if (!confirm('确定删除这个对话吗？')) return
+    await fetch('http://localhost:8000/api/sessions/' + id, { method: 'DELETE' })
+    loadSessions()
+    if (currentSessionId === id) {
+      const all = Object.values(sessions).flat().filter((s: any) => s.id !== id)
+      if (all.length > 0) selectSession(all[0].id)
+      else { setCurrentSessionId(null); handleNewChat() }
+    }
+  }
+
+  const currentSessionFull = (() => {
+    if (!currentSessionId) return null
+    for (const group of Object.values(sessions)) {
+      for (const s of group) {
+        if ((s as any).id === currentSessionId) return s
+      }
+    }
+    return null
+  })()
+
+  return (
+    <div className="page chat-page">
+      <div className="page-header"><h2>💬 AI 学习助手</h2><button className="btn-primary" onClick={handleNewChat}>+ New chat</button></div>
+
+      <div className="chat-body">
+        <aside className="chat-sidebar">
+          <div className="session-list-inner">
+            {!Object.values(sessions).some(g => g.length > 0) && (
+              <p style={{ padding: 20, textAlign: 'center', color: '#bbb', fontSize: 13 }}>暂无对话</p>
+            )}
+            {Object.entries(sessions).map(([g, list]) => {
+              if (list.length === 0) return null
+              return (
+                <div key={g} className="session-group">
+                  <div className="group-label">{g}</div>
+                  {(list as any[]).map((s: any) => (
+                    <div key={s.id} className={'session-row'+(currentSessionId===s.id?' active':'')}>
+                      <span className="session-name" onClick={() => selectSession(s.id)}>{s.title || '新对话'}</span>
+                      <button className="del-btn" onClick={() => del(s.id)}>&times;</button>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        </aside>
+
+        <section className="chat-main">
+          {currentSessionFull ? (
+            <>
+              <div className="messages-box">
+                {currentSessionFull.messages.map((m: any, i: number) => (
+                  <div key={i} className={'msg '+m.role}><div className="msg-bubble">{m.content.split('\n').map((l: string, ii: number) => <p key={ii}>{l}</p>)}</div></div>
+                ))}
+                {loading && <div className="msg assistant"><div className="msg-bubble"><span className="dots"><span>&#9679;</span><span>&#9679;</span><span>&#9679;</span></span></div></div>}
+                <div ref={(el: HTMLDivElement|null)=>el?.scrollIntoView()}></div>
+              </div>
+              <div className="input-box">
+                <textarea value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}} placeholder="输入你的问题..." rows={1} disabled={loading}/>
+                <button className="send-btn" onClick={send} disabled={!message.trim()||loading}>发送</button>
+              </div>
+            </>
+          ) : (
+            <div className="welcome-large">
+              <div className="welcome-icon">💬</div>
+              <h3>Start chatting with 学习助手</h3>
+              <p>点击左侧 "New chat" 或下方按钮开始新对话</p>
+              <button className="btn-outline" onClick={handleNewChat}>➜ 开始新对话</button>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════
+   记忆库
+   ════════════════════════════ */
+
+/* ════════════════════════════
+   时间线视图
+   ════════════════════════════ */
+
+function TimelinePage() {
+  const [events, setEvents] = useState<any[]>([])
+  useEffect(()=>{
+    fetch('http://localhost:8000/api/timeline').then(r=>r.json()).then(d=>setEvents(d.events||[])).catch(()=>{})
+  },[])
+
+  // 按日期分组
+  const grouped: Record<string, any[]> = {}
+  events.forEach(e => {
+    const d = e.date || '未知日期'
+    if (!grouped[d]) grouped[d] = []
+    grouped[d].push(e)
+  })
+  const dates = Object.keys(grouped).sort().reverse()
+
+  const typeIcon: Record<string, string> = { create: '✨', complete: '✅', update: '📝' }
+  const typeColor: Record<string, string> = { create: '#4CAF50', complete: '#e74c3c', update: '#2196F3' }
+
+  return (
+    <div className="page">
+      <div className="page-header"><h2>🕐 学习时间线</h2></div>
+      {dates.length === 0 && <div className="empty-state"><p>暂无学习记录</p></div>}
+      <div className="timeline">
+        {dates.map(date => (
+          <div key={date}>
+            <div className="timeline-date">{date}</div>
+            {grouped[date].map((e: any, i: number) => (
+              <div key={i} className="timeline-item">
+                <div className="timeline-dot" style={{background: typeColor[e.type] || '#999'}}></div>
+                <div className="timeline-content">
+                  <span className="timeline-icon">{typeIcon[e.type] || '📌'}</span>
+                  <span className="timeline-text">{e.content}</span>
+                  {e.note && <div className="timeline-note">📄 {e.note.length > 50 ? e.note.substring(0,50)+'...' : e.note}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════
+   技能详情页（独立页面）
+   ════════════════════════════ */
+
+function SkillDetailPage({ skillId, onBack, onEdit }: { skillId: string; onBack: () => void; onEdit: (id: string) => void }) {
+  const [skill, setSkill] = useState<Skill | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(()=>{
+    fetch('http://localhost:8000/api/skills').then(r=>r.json()).then(d=>{
+      const found = (d.skills||[]).find((s:any)=>s.id===skillId)
+      if(found) setSkill(found)
+    }).catch(()=>{})
+  },[skillId])
+
+  // ── 完成步骤 ──
+  const toggleDone=async(stepId:string)=>{
+    if(!skill) return
+    await fetch('http://localhost:8000/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skill_id:skill.id,completed_step:stepId,note:''})})
+    fetch('http://localhost:8000/api/skills').then(r=>r.json()).then(d=>{
+      const found = (d.skills||[]).find((s:any)=>s.id===skillId)
+      if(found) setSkill(found)
+    })
+  }
+
+  if(!skill) return <div className="page"><p style={{color:'#888'}}>加载中...</p></div>
+
+  const completed = skill.steps.filter((s:any)=>s.status==='completed').length
+  const total = skill.steps.length
+  const pct = total?Math.round(completed/total*100):0
+
+  return (
+    <div className="page">
+      {/* 返回 + 标题 */}
+      <div className="page-header">
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button className="btn-secondary" onClick={onBack} style={{padding:'6px 14px',fontSize:13}}>&#8592; 返回</button>
+          <h2>&#128218; {skill.name}</h2>
+        </div>
+        <button className="btn-primary" onClick={()=>onEdit(skill.id)}>&#9998; 编辑技能</button>
+      </div>
+
+      {/* 信息卡片 */}
+      <div className="card" style={{marginBottom:20}}>
+        <div style={{display:'flex',gap:40,flexWrap:'wrap'}}>
+          <div>
+            <span className="note-step-label">学习目标</span>
+            <p style={{fontSize:15,color:'#333',marginTop:4}}>{skill.goal}</p>
+          </div>
+          <div>
+            <span className="note-step-label">完成进度</span>
+            <p style={{fontSize:24,fontWeight:700,color:'var(--primary)',marginTop:4}}>
+              {completed}/{total} <span style={{fontSize:13,color:'#888'}}>({pct}%)</span>
+            </p>
+          </div>
+        </div>
+
+        {/* 进度条 */}
+        <div className="progress-bar" style={{height:10,borderRadius:5,marginTop:16}}>
+          <div className="progress-fill" style={{width:pct+'%',height:'100%',borderRadius:5}}/>
+        </div>
+      </div>
+
+      {/* 步骤列表 */}
+      <h3 style={{fontSize:15,fontWeight:600,marginBottom:12}}>学习步骤</h3>
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {skill.steps.map((step:any,i:number)=>{
+          const isDone = step.status==='completed'
+          const hasNote = !!step.note
+          return (
+            <div key={step.id} className={'step-card '+ (isDone?'done':'')}>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <input type="checkbox" checked={isDone} onChange={()=>toggleDone(step.id)} style={{accentColor:'#e74c3c',width:16,height:16}}/>
+                <span style={{fontSize:14,color:isDone?'#999':'#333',textDecoration:isDone?'line-through':'none',flex:1}}>{step.content}</span>
+                {isDone && step.completedAt && (
+                  <small style={{color:'#aaa',fontSize:11.5}}>&#10003; {step.completedAt.split('T')[0]}</small>
+                )}
+              </div>
+              {hasNote && (
+                <div style={{marginTop:6,marginLeft:26,fontSize:12,color:'#666',background:'#f9f9f9',padding:'6px 10px',borderRadius:6,lineHeight:1.5,maxWidth:500}}>
+                  &#128196; {step.note}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {total===0 && <div className="empty-state"><p>暂无步骤</p></div>}
+    </div>
+  )
+}
+
+function MemoryPage() {
+  const [list,setList]=useState<any[]>([])
+  useEffect(()=>{fetch('http://localhost:8000/api/memories').then(r=>r.json()).then(d=>setList(d.memories||[])).catch(()=>{})},[])
+  return (
+    <div className="page">
+      <div className="page-header"><h2>📝 记忆库</h2></div>
+      {list.length===0?<div className="empty-state"><p>暂无记忆数据</p></div>:
+        list.map((m:any,i:number)=>(<div key={i} className="card"><h3>{m.filename}</h3><pre className="mem-content">{(typeof m.content==='string') ? m.content : JSON.stringify(m.content, null, 2)}</pre></div>))
+      }
+    </div>
+  )
+}
+
+export default App

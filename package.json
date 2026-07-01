@@ -1,0 +1,50 @@
+{
+  "name": "skill-record-agent",
+  "version": "1.0.0",
+  "description": "学习管家 - 记录你的学习过程，追踪成长轨迹",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:electron": "set NODE_ENV=development&& electron .",
+    "build": "cd frontend && npm run build",
+    "dist": "npm run build && electron-builder",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": [
+    "learning",
+    "tracker",
+    "electron",
+    "react"
+  ],
+  "author": "smallfang",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.skill-record-agent",
+    "productName": "学习管家",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "backend/**/*",
+      "src/**/*",
+      ".env"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "frontend/public/favicon.svg"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

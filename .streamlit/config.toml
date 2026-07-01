@@ -1,0 +1,25 @@
+[server]
+# 禁用文件自动重载（避免每次保存时重新运行）
+fileWatcherType = "none"
+
+# 启用 CORS（允许跨域请求）
+enableCORS = false
+
+# 运行时不自动打开浏览器
+headless = true
+
+[browser]
+# 运行时不自动打开浏览器
+gatherUsageStats = false
+
+[runner]
+# 增加魔法命令超时时间
+magicTimeout = 60000
+
+[client]
+# 显示错误详情
+showErrorDetails = true
+
+[theme]
+# 使用浅色主题
+base = "light"

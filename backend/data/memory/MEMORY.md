@@ -1,0 +1,4 @@
+- [learning-plan-化妆](learning-plan-化妆.md) — 化妆 学习计划：画一个全妆
+- [learning-plan-大语言模型（前端）](learning-plan-大语言模型（前端）.md) — 大语言模型（前端） 学习计划：掌握大语言模型的前端开发技能
+- [learning-plan-雅思](learning-plan-雅思.md) — 雅思 学习计划：雅思7分
+- [progress-大语言模型（前端）-20260630202010](progress-大语言模型（前端）-20260630202010.md) — 大语言模型（前端） 进度：第1阶段（1-2周）：LLM基础认知 - 了解大语言模型的基本概念、API调用方式（OpenAI/Claude/通义千问等）、Prompt Engineering基础
