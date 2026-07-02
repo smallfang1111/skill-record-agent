@@ -19,8 +19,18 @@ WORKDIR = Path.cwd()
 TRANSCRIPT_DIR = WORKDIR / ".transcripts"
 TOOL_RESULTS_DIR = WORKDIR / ".task_outputs" / "tool-results"
 
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
+
+def _get_client():
+    """延迟获取 Anthropic 客户端（每次调用都读最新环境变量，支持用户动态配置）"""
+    return Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
+        base_url=os.environ.get("ANTHROPIC_BASE_URL") or None
+    )
+
+
+def _get_model():
+    """延迟获取模型名称"""
+    return os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
 
 # 导入工具和记忆模块
 from src.agent.tools import TOOLS, TOOL_HANDLERS, extract_text
@@ -118,8 +128,8 @@ def write_transcript(msgs):
 def summarize_history(msgs):
     """使用 LLM 总结对话历史"""
     conv = json.dumps(msgs, default=str)[:80000]
-    r = client.messages.create(
-        model=MODEL,
+    r = _get_client().messages.create(
+        model=_get_model(),
         messages=[{"role": "user", "content":
             "Summarize this coding-agent conversation so work can continue.\n"
             "Preserve: 1. current goal, 2. key findings, 3. files changed, 4. remaining work, 5. user constraints.\n\n" + conv}],
@@ -264,8 +274,8 @@ def agent_loop(messages: list):
                     **messages[memory_turn],
                     "content": memories_content + "\n\n" + messages[memory_turn]["content"],
                 }
-            response = client.messages.create(
-                model=MODEL, system=system, messages=request_messages, tools=TOOLS, max_tokens=8000
+            response = _get_client().messages.create(
+                model=_get_model(), system=system, messages=request_messages, tools=TOOLS, max_tokens=8000
             )
             # 添加这几行来查看缓存命中情况
             print(response.usage,'1')

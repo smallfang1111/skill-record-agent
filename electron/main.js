@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 
 let mainWindow
 let pythonProcess
+let modalOpen = false
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -30,6 +31,24 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+
+  // 有模态框打开时，拦截窗口关闭：不弹提示，改为让模态框抖一下
+  mainWindow.on('close', (e) => {
+    if (modalOpen) {
+      e.preventDefault()
+      mainWindow.webContents.send('modal-shake')
+    }
+  })
+
+  // 有模态框打开时，拦截刷新（Ctrl/Cmd+R）：不弹提示，模态框抖一下
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if ((input.control || input.meta) && input.key.toLowerCase() === 'r' && !input.isAutoRepeat) {
+      if (modalOpen) {
+        event.preventDefault()
+        mainWindow.webContents.send('modal-shake')
+      }
+    }
   })
 }
 
@@ -89,4 +108,21 @@ ipcMain.handle('api-call', async (event, options) => {
     console.error('API call failed:', error)
     throw error
   }
+})
+
+// 渲染进程通知：当前是否有模态框打开
+ipcMain.on('modal-state', (event, open) => {
+  modalOpen = !!open
+})
+
+// 打开系统目录选择框，返回选中的绝对路径
+ipcMain.handle('dialog:openDirectory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择聊天记录存储目录',
+    properties: ['openDirectory', 'createDirectory']
+  })
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return null
+  }
+  return result.filePaths[0]
 })

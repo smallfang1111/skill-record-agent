@@ -1,0 +1,7 @@
+- [user-intent-learning-plan](user-intent-learning-plan.md) — User is starting to express a learning intention, potentially a new skill.
+- [user-query-current-skills](user-query-current-skills.md) — User asks to list all current learning skills with progress
+- [user-question-makeup-benefits](user-question-makeup-benefits.md) — User asked about benefits of learning makeup
+- [user-study-progress-ielts](user-study-progress-ielts.md) — User's current progress in IELTS: aiming for band 8, step 3/6
+- [user-study-progress-illustration](user-study-progress-illustration.md) — User's current progress in illustration skill: drawing a flower well, step 0/1
+- [user-study-progress-llm](user-study-progress-llm.md) — User's current progress in large language models: aiming for an LLM application development job, step 2/4
+- [user-study-progress-makeup](user-study-progress-makeup.md) — User's current progress in makeup skill: various makeup styles, step 6/6

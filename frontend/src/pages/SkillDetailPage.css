@@ -1,0 +1,80 @@
+/* ════════════════════════════
+   SkillDetailPage 技能详情样式
+   ════════════════════════════ */
+
+/* 步骤卡片 */
+.step-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  border-left: 3px solid #ddd;
+  transition: background .15s, border-color .2s, box-shadow .2s;
+}
+.step-card.done {
+  background: #f8fdf9;
+  border-left-color: #4CAF50;
+}
+.step-card.editing {
+  border-color: var(--primary);
+  border-left-color: var(--primary);
+  box-shadow: 0 2px 12px rgba(231,76,60,0.08);
+  background: #fffaf9;
+}
+
+/* 步骤编辑面板 */
+.step-edit-panel {
+  padding-top: 4px;
+}
+.step-edit-panel .field-label {
+  font-size: 12px;
+}
+
+/* 笔记预览 */
+.step-note-preview {
+  font-size: 11.5px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-left: 4px;
+  cursor: pointer;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .15s;
+}
+.step-note-preview:hover { background: #eee; }
+
+/* 笔记弹窗内 */
+.note-step-info {
+  padding: 10px 12px;
+  background: #f7f8fa;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.note-step-label { color: var(--text-light); }
+.note-step-name { font-weight: 500; color: var(--text-dark); }
+
+.note-textarea { min-height: 140px; }
+
+/* 通用笔记按钮 */
+.note-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.note-btn:hover { opacity: 1 !important; }
+.note-btn.has-note { opacity: 1 !important; }
+
+.char-count {
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--text-light);
+  margin-top: 4px;
+}

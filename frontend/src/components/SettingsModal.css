@@ -1,0 +1,136 @@
+/* 设置弹窗 */
+.settings-modal {
+  max-width: 600px;
+}
+
+/* 左右布局：左侧 Tab 竖排，右侧内容 */
+.settings-layout {
+  display: flex;
+  gap: 0;
+  margin: 0 -4px;
+}
+
+/* 左侧竖排 Tab */
+.settings-sidebar {
+  flex: 0 0 150px;
+  border-right: 1px solid var(--border);
+  padding-right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-tab {
+  border: none;
+  background: none;
+  padding: 11px 14px;
+  font-size: 13.5px;
+  color: #888;
+  cursor: pointer;
+  border-radius: 8px;
+  text-align: left;
+  transition: background .15s, color .15s;
+}
+.settings-tab:hover {
+  background: #f5f5f5;
+  color: #555;
+}
+.settings-tab.active {
+  background: #fff5f5;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 右侧内容区 */
+.settings-content {
+  flex: 1;
+  padding-left: 24px;
+  min-width: 0;
+}
+
+.settings-section {
+  margin-bottom: 24px;
+}
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.settings-hint {
+  font-size: 11.5px;
+  color: #999;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.settings-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  background: #fff;
+  box-sizing: border-box;
+}
+.settings-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(231,76,60,0.08);
+}
+
+.model-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #555;
+  background: #fafafa;
+  cursor: default;
+  user-select: none;
+}
+.model-tag.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #fff5f5;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* 侧边栏设置按钮 */
+.nav-settings {
+  width: 100%;
+  text-align: left;
+  padding: 10px 18px;
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  transition: background .15s, color .15s;
+  margin-top: auto;
+}
+.nav-settings:hover {
+  background: #f5f5f5;
+  color: #333;
+}

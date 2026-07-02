@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import './TimelinePage.css';
 
 function TimelinePage() {
   const [events, setEvents] = useState<any[]>([]);

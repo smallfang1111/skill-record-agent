@@ -1,0 +1,40 @@
+/* ════════════════════════════
+   DashboardPage 仪表盘样式
+   ════════════════════════════ */
+
+/* 大空状态 */
+.empty-state-large {
+  text-align: center;
+  padding: 60px 0 50px;
+}
+.empty-state-large .empty-icon { font-size: 56px; margin-bottom: 16px; }
+.empty-state-large h3 { font-size: 19px; color: var(--text-dark); margin-bottom: 8px; }
+.empty-state-large p {
+  font-size: 13.5px;
+  color: var(--text-light);
+  line-height: 1.65;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+/* 统计卡片 */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 30px;
+}
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  text-align: center;
+}
+.stat-number {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+.stat-label { font-size: 13px; color: var(--text-light); }

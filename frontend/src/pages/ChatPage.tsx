@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import './ChatPage.css';
 
 interface Session { id: string; title: string; messages: { role: string; content: string; timestamp: string }[] }
 

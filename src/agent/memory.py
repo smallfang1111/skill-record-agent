@@ -15,6 +15,7 @@
 import os
 import json
 import re
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -24,16 +25,27 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # 配置
+from src.data.skills import load_skills as _load_skills_from_store
 WORKDIR = Path.cwd()
 MEMORY_DIR = WORKDIR / "data" / "memory"
 MEMORY_DIR.mkdir(parents=True, exist_ok=True)
 MEMORY_INDEX = MEMORY_DIR / "MEMORY.md"
 TRANSCRIPT_DIR = WORKDIR / ".transcripts"
 
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
-
 MEMORY_TYPES = ["user", "feedback", "project", "reference"]
+
+
+def _get_client():
+    """延迟获取 Anthropic 客户端（每次调用都读最新环境变量，支持用户动态配置）"""
+    return Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
+        base_url=os.environ.get("ANTHROPIC_BASE_URL") or None
+    )
+
+
+def _get_model():
+    """延迟获取模型名称"""
+    return os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
 
 
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -51,15 +63,21 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
     return meta, parts[2].strip()
 
 
-def write_memory_file(name: str, mem_type: str, description: str, body: str):
-    """写入单个记忆文件（带 YAML frontmatter）"""
+def write_memory_file(name: str, mem_type: str, description: str, body: str, skill: str = ""):
+    """写入单个记忆文件（带 YAML frontmatter）。
+
+    skill: 该记忆关联的技能名称（如有）。用于后续按「当前技能集合」过滤，
+           避免已删除技能的记忆仍被注入给 AI。
+    """
     slug = name.lower().replace(" ", "-").replace("/", "-")
     filename = f"{slug}.md"
     filepath = MEMORY_DIR / filename
-    filepath.write_text(
-        f"---\nname: {name}\ndescription: {description}\ntype: {mem_type}\n---\n\n{body}\n",
-        encoding='utf-8'
+    front = (
+        f"---\nname: {name}\ndescription: {description}\ntype: {mem_type}"
+        + (f"\nskill: {skill}" if skill else "")
+        + "\n---\n\n"
     )
+    filepath.write_text(front + body + "\n", encoding='utf-8')
     _rebuild_index()
     return filepath
 
@@ -84,15 +102,55 @@ def _rebuild_index():
         pass
 
 
-def read_memory_index() -> str:
-    """读取 MEMORY.md 索引（每次 turn 注入到 SYSTEM 提示词中）"""
-    if not MEMORY_INDEX.exists():
-        return ""
+def _current_skill_names() -> set:
+    """返回技能管理里当前存在的技能名称集合"""
     try:
-        text = MEMORY_INDEX.read_text(encoding='utf-8', errors='replace').strip()
+        return {s.get('name', '').strip() for s in _load_skills_from_store() if (s.get('name') or '').strip()}
     except Exception:
+        return set()
+
+
+def _memory_skill(content: str) -> str | None:
+    """从记忆内容中解析其关联的技能名称。
+
+    优先读取 frontmatter 的 skill 字段；否则从学习管家专用
+    记忆体（学习计划 / 进度更新）的标题中提取。
+    无法确定时返回 None（视为与技能无关的通用记忆）。
+    """
+    meta, body = _parse_frontmatter(content)
+    skill = (meta.get('skill') or '').strip()
+    if skill:
+        return skill
+    for line in body.splitlines():
+        m = re.match(r'^##\s+(.+?)\s+学习计划', line) or re.match(r'^##\s+(.+?)\s+学习进度更新', line)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+def filter_skill_memories(memory_list: list) -> list:
+    """过滤掉仅关联「已删除技能」的记忆，只保留与当前技能相关或无关的通用记忆。"""
+    current = _current_skill_names()
+    out = []
+    for m in memory_list:
+        skill = _memory_skill(m.get('body', '') or '')
+        if skill and skill not in current:
+            continue
+        out.append(m)
+    return out
+
+
+def read_memory_index() -> str:
+    """读取记忆索引（每次 turn 注入到 SYSTEM 提示词中）。
+
+    仅包含与当前技能管理里存在的技能相关的记忆，
+    避免 AI 助手提及已被删除的技能。
+    """
+    files = filter_skill_memories(list_memory_files())
+    if not files:
         return ""
-    return text if text else ""
+    lines = [f"- [{m['name']}]({m['filename']}) — {m['description']}" for m in files]
+    return "\n".join(lines)
 
 
 def read_memory_file(filename: str) -> str | None:
@@ -168,12 +226,12 @@ def select_relevant_memories(messages: list, max_items: int = 5) -> list[str]:
     )
 
     try:
-        response = client.messages.create(
-            model=MODEL,
+        response = _get_client().messages.create(
+            model=_get_model(),
             messages=[{"role": "user", "content": prompt}],
             max_tokens=200,
         )
-        
+
         # 添加这几行来查看缓存命中情况
         print(response.usage,'2')
         text = extract_text(response.content).strip()
@@ -203,18 +261,54 @@ def select_relevant_memories(messages: list, max_items: int = 5) -> list[str]:
 
 
 def load_memories(messages: list) -> str:
-    """加载相关记忆内容，用于注入上下文"""
+    """加载相关记忆内容，用于注入上下文。
+
+    注入前会按「当前技能集合」过滤：仅关联已删除技能的记忆不会被注入，
+    确保 AI 助手只提及技能管理里现存的技能。
+    """
     selected_files = select_relevant_memories(messages)
     if not selected_files:
         return ""
 
+    current = _current_skill_names()
     parts = ["<relevant_memories>"]
     for filename in selected_files:
         content = read_memory_file(filename)
-        if content:
-            parts.append(content)
+        if not content:
+            continue
+        skill = _memory_skill(content)
+        if skill and skill not in current:
+            continue
+        parts.append(content)
+    if len(parts) == 1:
+        return ""
     parts.append("</relevant_memories>")
     return "\n\n".join(parts)
+
+
+def delete_memories_for_skill(skill_name: str) -> int:
+    """删除与某技能关联的所有记忆文件，并重建索引。
+
+    在技能被删除时调用，保持记忆系统与技能管理一致。
+    """
+    if not skill_name:
+        return 0
+    removed = 0
+    for f in list(MEMORY_DIR.glob("*.md")):
+        if f.name == "MEMORY.md":
+            continue
+        try:
+            raw = f.read_text(encoding='utf-8', errors='replace')
+        except Exception:
+            continue
+        if _memory_skill(raw) == skill_name:
+            try:
+                f.unlink()
+                removed += 1
+            except Exception:
+                pass
+    _rebuild_index()
+    return removed
 
 
 def extract_memories(messages: list):
@@ -253,10 +347,10 @@ def extract_memories(messages: list):
     )
 
     try:
-        response = client.messages.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}], max_tokens=800
+        response = _get_client().messages.create(
+            model=_get_model(), messages=[{"role": "user", "content": prompt}], max_tokens=800
         )
-        
+
         # 添加这几行来查看缓存命中情况
         print(response.usage,'3')
         text = extract_text(response.content).strip()
@@ -306,10 +400,10 @@ def consolidate_memories():
     )
 
     try:
-        response = client.messages.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}], max_tokens=3000
+        response = _get_client().messages.create(
+            model=_get_model(), messages=[{"role": "user", "content": prompt}], max_tokens=3000
         )
-        
+
         # 添加这几行来查看缓存命中情况
         print(response.usage,'4')
         text = extract_text(response.content).strip()

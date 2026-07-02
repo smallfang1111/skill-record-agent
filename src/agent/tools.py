@@ -25,8 +25,18 @@ load_dotenv(override=True)
 WORKDIR = Path.cwd()
 TOOL_RESULTS_DIR = WORKDIR / ".task_outputs" / "tool-results"
 
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
+
+def _get_client():
+    """延迟获取 Anthropic 客户端"""
+    return Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
+        base_url=os.environ.get("ANTHROPIC_BASE_URL") or None
+    )
+
+
+def _get_model():
+    """延迟获取模型名称"""
+    return os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
 
 
 # ═══════════════════════════════════════════════
@@ -144,8 +154,8 @@ def spawn_subagent(task: str) -> str:
     print(f"\n\033[35m[Subagent spawned]\033[0m")
     messages = [{"role": "user", "content": task}]
     for _ in range(30):
-        response = client.messages.create(
-            model=MODEL, system=SUB_SYSTEM,
+        response = _get_client().messages.create(
+            model=_get_model(), system=SUB_SYSTEM,
             messages=messages, tools=SUB_TOOLS, max_tokens=8000
         )
         
@@ -200,7 +210,8 @@ def create_learning_plan(skill: str, goal: str, steps: list) -> str:
         f"learning-plan-{skill}",
         "project",
         f"{skill} 学习计划：{goal}",
-        memory_body.strip()
+        memory_body.strip(),
+        skill=skill,
     )
     return f"✅ 已为「{skill}」创建学习计划，共 {len(steps)} 个步骤。\n目标：{goal}"
 
@@ -217,7 +228,8 @@ def update_progress(skill: str, completed: str, note: str = "") -> str:
         f"progress-{skill}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
         "user",
         f"{skill} 进度：{completed}",
-        memory_body.strip()
+        memory_body.strip(),
+        skill=skill,
     )
     return f"✅ {skill} 进度已更新：{completed}"
 

@@ -1,104 +1,18 @@
 [
   {
-    "id": "20260630194902",
-    "name": "化妆11",
-    "goal": "化各种妆容222 ",
+    "id": "20260702152444",
+    "name": "插画",
+    "goal": "插一个好花",
     "steps": [
       {
-        "id": "20260630194902-0",
-        "content": "1. 认识各类化妆工具",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-07-01T10:36:45.101898"
-      },
-      {
-        "id": "20260630194902-1",
-        "content": "2. 画好一个底妆",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-07-01T10:36:34.078336"
-      },
-      {
-        "id": "20260630194902-2",
-        "content": "3. 眼妆",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-07-01T10:36:36.821612"
-      },
-      {
-        "id": "20260630194902-3",
-        "content": "4. 唇妆",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-06-30T20:22:12.297571"
-      },
-      {
-        "id": "20260630194902-4",
-        "content": "5. 腮红",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-06-30T20:22:13.642096"
-      },
-      {
-        "id": "20260630194902-5",
-        "content": "6. 眉毛",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-06-30T20:22:14.633947"
-      }
-    ],
-    "createdAt": "2026-06-30T19:49:02.297065",
-    "updatedAt": "2026-07-01T10:37:12.317109"
-  },
-  {
-    "id": "20260701103916",
-    "name": "雅思",
-    "goal": "雅思7.5",
-    "steps": [
-      {
-        "id": "20260701103916-0",
-        "content": "每天背100个单词",
-        "status": "completed",
-        "note": "",
-        "completedAt": "2026-07-01T10:39:30.870107"
-      },
-      {
-        "id": "20260701103916-1",
-        "content": "一篇听力",
-        "status": "pending",
-        "note": "",
-        "completedAt": null
-      },
-      {
-        "id": "20260701103916-2",
-        "content": "一篇阅读",
-        "status": "pending",
-        "note": "",
-        "completedAt": null
-      },
-      {
-        "id": "20260701103916-3",
-        "content": "半小时口语话题",
-        "status": "pending",
-        "note": "",
-        "completedAt": null
-      },
-      {
-        "id": "20260701103916-4",
-        "content": "一篇小作文",
-        "status": "pending",
-        "note": "",
-        "completedAt": null
-      },
-      {
-        "id": "20260701103916-5",
-        "content": "一篇大作文",
+        "id": "20260702152444-0",
+        "content": "每天学两小时插画",
         "status": "pending",
         "note": "",
         "completedAt": null
       }
     ],
-    "createdAt": "2026-07-01T10:39:16.662834",
-    "updatedAt": "2026-07-01T10:39:30.870107"
+    "createdAt": "2026-07-02T15:24:44.066369",
+    "updatedAt": "2026-07-02T15:24:44.066369"
   }
 ]

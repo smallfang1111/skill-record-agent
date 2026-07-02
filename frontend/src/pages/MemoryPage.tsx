@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import './MemoryPage.css';
 
 function MemoryPage() {
   const [list, setList] = useState<any[]>([]);

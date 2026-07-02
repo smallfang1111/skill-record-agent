@@ -11,18 +11,37 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
-SESSIONS_FILE = DATA_DIR / "chat_sessions.json"
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+SETTINGS_FILE = DATA_DIR / "settings.json"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _resolve_sessions_file() -> Path:
+    """根据设置中的工作区目录决定会话存储位置；未配置则回退到默认 DATA_DIR"""
+    workspace = ""
+    if SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SETTINGS_FILE.read_text(encoding='utf-8'))
+            workspace = (data.get('workspace') or '').strip()
+        except Exception:
+            pass
+    if workspace:
+        target = Path(workspace)
+    else:
+        target = DATA_DIR
+    target.mkdir(parents=True, exist_ok=True)
+    return target / "chat_sessions.json"
+
+
 def load_sessions() -> List[dict]:
     """加载所有会话"""
-    if not SESSIONS_FILE.exists():
+    sessions_file = _resolve_sessions_file()
+    if not sessions_file.exists():
         return []
     try:
-        with open(SESSIONS_FILE, 'r', encoding='utf-8') as f:
+        with open(sessions_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception:
         return []
@@ -30,7 +49,9 @@ def load_sessions() -> List[dict]:
 
 def save_sessions(sessions: List[dict]):
     """保存所有会话"""
-    with open(SESSIONS_FILE, 'w', encoding='utf-8') as f:
+    sessions_file = _resolve_sessions_file()
+    sessions_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(sessions_file, 'w', encoding='utf-8') as f:
         json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 

@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import './App.css'
 
-type Page = 'dashboard' | 'skills' | 'chat' | 'memory' | 'timeline'
-
 import EditSkillModal from './components/EditSkillModal'
+import SettingsModal from './components/SettingsModal'
 import DashboardPage from './pages/DashboardPage'
 import SkillsPage from './pages/SkillsPage'
 import SkillDetailPage from './pages/SkillDetailPage'
@@ -11,65 +11,120 @@ import ChatPage from './pages/ChatPage'
 import MemoryPage from './pages/MemoryPage'
 import TimelinePage from './pages/TimelinePage'
 
-function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard')
-  const [detailSkillId, setDetailSkillId] = useState<string | null>(null)
-  const [editSkillId, setEditSkillId] = useState<string | null>(null)
+// ── 侧边栏导航组件 ──
+function Sidebar({ currentPage, onNavigate, onOpenSettings }: { currentPage: string; onNavigate: (page: string) => void; onOpenSettings: () => void }) {
+  const pages = [
+    { key: 'dashboard', label: '仪表盘', icon: '🏠' },
+    { key: 'skills',    label: '技能管理', icon: '✅' },
+    { key: 'chat',      label: 'AI 助手',  icon: '💬' },
+    { key: 'memory',    label: '记忆库',   icon: '📝' },
+    { key: 'timeline',  label: '时间线',   icon: '🕐' },
+  ]
+  return (
+    <aside className="sidebar">
+      <div className="logo-area">
+        <div className="logo-icon">📚</div>
+        <h1 className="logo-title">学习管家</h1>
+        <p className="logo-sub">记录你的学习过程</p>
+      </div>
+      <nav className="nav-menu">
+        {pages.map(p => (
+          <button key={p.key} className={'nav-item' + (currentPage === p.key ? ' active' : '')}
+            onClick={() => onNavigate(p.key)}>
+            {p.icon} {p.label}
+          </button>
+        ))}
+      </nav>
+      <div className="sidebar-footer"><p className="footer-hint">还没有技能？去添加吧！</p></div>
+      <button className="nav-settings" onClick={onOpenSettings}>&#9881; 设置</button>
+    </aside>
+  )
+}
 
-  // 聊天状态提升到这里，避免切 tab 时丢失
+// ── 主布局 ──
+function AppLayout() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // 从 URL 解析当前页面
+  const getPageFromPath = (path: string) => {
+    if (path.startsWith('/skills')) return 'skills'
+    if (path.startsWith('/chat'))   return 'chat'
+    if (path.startsWith('/memory')) return 'memory'
+    if (path.startsWith('/timeline')) return 'timeline'
+    return 'dashboard'
+  }
+  const currentPage = getPageFromPath(location.pathname)
+
+  // 编辑技能弹窗状态（从 URL search param 读取，刷新不丢失）
+  const editSkillIdFromUrl = searchParams.get('edit')
+  const [refreshKey, setRefreshKey] = useState(0)
+  // 设置弹窗
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // 聊天状态提升到这里
   const [chatSessions, setChatSessions] = useState<Record<string, { id: string; title: string; messages: { role: string; content: string; timestamp: string }[] }[]>>({})
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
+  const onNavigate = (page: string) => {
+    const pathMap: Record<string, string> = {
+      dashboard: '/',
+      skills: '/skills',
+      chat: '/chat',
+      memory: '/memory',
+      timeline: '/timeline',
+    }
+    navigate(pathMap[page] || '/')
+  }
+
+  const openEditModal = (skillId: string) => {
+    setSearchParams({ edit: skillId })
+  }
+  const closeEditModal = () => {
+    setSearchParams({})
+  }
+
   return (
     <div className="app-layout">
-      {/* 左侧边栏 */}
-      <aside className="sidebar">
-        <div className="logo-area">
-          <div className="logo-icon">📚</div>
-          <h1 className="logo-title">学习管家</h1>
-          <p className="logo-sub">记录你的学习过程</p>
-        </div>
+      <Sidebar currentPage={currentPage} onNavigate={onNavigate} onOpenSettings={() => setSettingsOpen(true)} />
 
-        <nav className="nav-menu">
-          <button className={'nav-item'+(currentPage==='dashboard'?' active':'')} onClick={()=>setCurrentPage('dashboard')}>🏠 仪表盘</button>
-          <button className={'nav-item'+(currentPage==='skills'?' active':'')} onClick={()=>setCurrentPage('skills')}>✅ 技能管理</button>
-          <button className={'nav-item'+(currentPage==='chat'?' active':'')} onClick={()=>setCurrentPage('chat')}>💬 AI 助手</button>
-          <button className={'nav-item'+(currentPage==='memory'?' active':'')} onClick={()=>setCurrentPage('memory')}>📝 记忆库</button>
-          <button className={'nav-item'+(currentPage==='timeline'?' active':'')} onClick={()=>setCurrentPage('timeline')}>🕐 时间线</button>
-        </nav>
-
-        <div className="sidebar-footer"><p className="footer-hint">还没有技能？去添加吧！</p></div>
-      </aside>
-
-      {/* 右侧内容区 */}
       <main className="main-content">
-        <div style={{display: currentPage!=='dashboard' ? 'none' : 'block'}}>
-          <DashboardPage onGoSkills={()=>setCurrentPage('skills')} />
-        </div>
-        <div style={{display: currentPage!=='skills' ? 'none' : 'block'}}>
-          {detailSkillId
-            ? <SkillDetailPage skillId={detailSkillId} onBack={()=>setDetailSkillId(null)} onEdit={(id)=>{setEditSkillId(id);}} />
-            : <SkillsPage onOpenDetail={setDetailSkillId} onOpenEdit={setEditSkillId} />
-          }
-          {/* 编辑技能弹窗（从 App 层管理，这样详情页也能打开） */}
-          {editSkillId && <EditSkillModal skillId={editSkillId} onClose={()=>setEditSkillId(null)} onSaved={()=>{setEditSkillId(null);setDetailSkillId(null);}} />}
-        </div>
-        <div style={{display: currentPage!=='chat' ? 'none' : 'block'}}>
-          <ChatPage
-            sessions={chatSessions}
-            setSessions={setChatSessions}
-            currentSessionId={currentSessionId}
-            setCurrentSessionId={setCurrentSessionId}
-          />
-        </div>
-        <div style={{display: currentPage!=='memory' ? 'none' : 'block'}}>
-          <MemoryPage />
-        </div>
-        <div style={{display: currentPage!=='timeline' ? 'none' : 'block'}}>
-          <TimelinePage />
-        </div>
+        <Routes>
+          <Route path="/" element={<DashboardPage onGoSkills={() => navigate('/skills')} />} />
+          <Route path="/skills" element={
+            <SkillsPage onOpenEdit={openEditModal} refreshKey={refreshKey} />
+          } />
+          <Route path="/skills/:skillId" element={
+            <SkillDetailPage onEdit={openEditModal} refreshKey={refreshKey} />
+          } />
+          <Route path="/chat" element={
+            <ChatPage sessions={chatSessions} setSessions={setChatSessions}
+              currentSessionId={currentSessionId} setCurrentSessionId={setCurrentSessionId} />
+          } />
+          <Route path="/memory" element={<MemoryPage />} />
+          <Route path="/timeline" element={<TimelinePage />} />
+        </Routes>
+
+        {/* 设置弹窗 */}
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={() => setSettingsOpen(false)} />
+
+        {/* 编辑技能弹窗（从 URL search param 控制，刷新不丢失） */}
+        {editSkillIdFromUrl && (
+          <EditSkillModal skillId={editSkillIdFromUrl} onClose={closeEditModal}
+            onSaved={() => { closeEditModal(); setRefreshKey(k => k + 1) }} />
+        )}
       </main>
     </div>
+  )
+}
+
+// ── 最外层 ──
+function App() {
+  return (
+    <BrowserRouter>
+      <AppLayout />
+    </BrowserRouter>
   )
 }
 

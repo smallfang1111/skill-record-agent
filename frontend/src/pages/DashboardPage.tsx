@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import './DashboardPage.css';
 
 interface DashboardPageProps {
   onGoSkills: () => void;

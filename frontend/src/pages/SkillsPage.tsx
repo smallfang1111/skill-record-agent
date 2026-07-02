@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import './SkillsPage.css';
 
 interface Skill { id: string; name: string; goal: string; steps: { id: string; content: string; status: string; note: string; completedAt?: string }[] }
 
 interface SkillsPageProps {
-  onOpenDetail: (id: string) => void;
   onOpenEdit: (id: string) => void;
+  refreshKey?: number;
 }
 
-function SkillsPage({ onOpenDetail, onOpenEdit }: SkillsPageProps) {
+function SkillsPage({ onOpenEdit, refreshKey }: SkillsPageProps) {
+  const navigate = useNavigate();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', goal: '', steps: '' });
@@ -26,7 +29,7 @@ function SkillsPage({ onOpenDetail, onOpenEdit }: SkillsPageProps) {
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'inprogress'>('all');
 
   const load = () => fetch('http://localhost:8000/api/skills').then(r => r.json()).then(d => setSkills(d.skills || [])).catch(() => {});
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [refreshKey]);
 
   // 创建技能
   const create = async () => {
@@ -204,7 +207,7 @@ function SkillsPage({ onOpenDetail, onOpenEdit }: SkillsPageProps) {
           const total = skill.steps.length;
           const pct = total ? Math.round(completed / total * 100) : 0;
           return (
-            <div key={skill.id} className="skill-grid-card" onClick={() => onOpenDetail(skill.id)}>
+            <div key={skill.id} className="skill-grid-card" onClick={() => navigate('/skills/' + skill.id)}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%' }}>
                 <div className="skill-icon">🧑</div>
                 <div style={{ flex: 1 }}>

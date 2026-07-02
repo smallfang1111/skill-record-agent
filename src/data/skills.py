@@ -78,21 +78,26 @@ def get_skill(skill_id: str) -> Optional[dict]:
     return None
 
 
-def update_step(skill_id: str, step_id: str, note: str = '') -> dict:
-    """更新步骤状态（完成）"""
+def update_step(skill_id: str, step_id: str, note: str = '', status: str = 'completed') -> dict:
+    """更新步骤状态（支持 completed / inprogress 双向切换）"""
     skills = load_skills()
-    
+
     for skill in skills:
         if skill['id'] == skill_id:
             for step in skill['steps']:
                 if step['id'] == step_id:
-                    step['status'] = 'completed'
+                    step['status'] = status
                     step['note'] = note
-                    step['completedAt'] = datetime.now().isoformat()
+                    # 只有标记完成时才记录完成时间
+                    if status == 'completed':
+                        step['completedAt'] = datetime.now().isoformat()
+                    else:
+                        # 取消完成时清除完成时间
+                        step.pop('completedAt', None)
                     skill['updatedAt'] = datetime.now().isoformat()
                     save_skills(skills)
                     return skill
-    
+
     raise ValueError(f"步骤 {step_id} 不存在")
 
 

@@ -1,0 +1,8 @@
+{
+  "model": "deepseek-chat",
+  "api_key": "sk-36ef7a67e70d4b92a62a61c32fa1288a",
+  "base_url": "https://api.deepseek.com/anthropic",
+  "models": [],
+  "workspace": "C:\\Users\\v_lfangtian\\Desktop\\chat-record",
+  "updatedAt": "2026-07-02T15:09:54.681140"
+}
