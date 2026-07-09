@@ -17,6 +17,7 @@ frontend/.vite/
 # Environment
 .env
 .env.local
+.venv/
 
 # Database
 *.db
